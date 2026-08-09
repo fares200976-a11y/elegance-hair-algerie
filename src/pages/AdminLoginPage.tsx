@@ -72,12 +72,6 @@ export const AdminLoginPage: React.FC = () => {
             />
           </div>
 
-          <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 text-[11px] text-amber-900">
-            💡 <strong>Identifiants par défaut :</strong><br />
-            Email : <code>admin@elegancehair.dz</code><br />
-            Mot de passe : <code>admin123456</code>
-          </div>
-
           <button
             type="submit"
             disabled={isLoading}
