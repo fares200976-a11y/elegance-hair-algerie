@@ -1,0 +1,6 @@
+{
+  "name": "Élégance Hair Algérie",
+  "description": "Boutique en ligne haut de gamme spécialisée dans les appareils de coiffure professionnels en Algérie - Paiement à la livraison",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
