@@ -1,15 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, RefreshCw, Trash2, Power, Copy, Check, Link as LinkIcon, ExternalLink } from 'lucide-react';
-import { fetchTeamMembers, createTeamMember, regenerateTeamMemberCode, setTeamMemberActive, deleteTeamMember } from '../lib/api';
+import { Users, Plus, RefreshCw, Trash2, Power, Copy, Check, Link as LinkIcon, ExternalLink, Pencil, Save, X, Phone, MessageCircle, Mail } from 'lucide-react';
+import { fetchTeamMembers, createTeamMember, updateTeamMember, regenerateTeamMemberCode, setTeamMemberActive, deleteTeamMember } from '../lib/api';
 import { TeamMember } from '../types';
 
 export const AdminTeam: React.FC = () => {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [newName, setNewName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+
+  // Formulaire d'ajout
+  const [newName, setNewName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newWhatsapp, setNewWhatsapp] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+
+  // Édition inline des contacts d'un membre existant
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editPhone, setEditPhone] = useState('');
+  const [editWhatsapp, setEditWhatsapp] = useState('');
+  const [editEmail, setEditEmail] = useState('');
 
   const staffUrl = `${window.location.origin}/staff`;
 
@@ -40,9 +51,17 @@ export const AdminTeam: React.FC = () => {
     if (!newName.trim()) return;
     setIsSubmitting(true);
     try {
-      const created = await createTeamMember(newName.trim());
+      const created = await createTeamMember({
+        name: newName.trim(),
+        phone: newPhone.trim() || undefined,
+        whatsapp: newWhatsapp.trim() || undefined,
+        email: newEmail.trim() || undefined
+      });
       setMembers(prev => [created, ...prev]);
       setNewName('');
+      setNewPhone('');
+      setNewWhatsapp('');
+      setNewEmail('');
     } catch (err) {
       console.error('Erreur ajout membre:', err);
     } finally {
@@ -84,6 +103,29 @@ export const AdminTeam: React.FC = () => {
     setTimeout(() => setCopiedId(null), 1500);
   };
 
+  const startEdit = (member: TeamMember) => {
+    setEditingId(member.id);
+    setEditPhone(member.phone || '');
+    setEditWhatsapp(member.whatsapp || '');
+    setEditEmail(member.email || '');
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  const saveEdit = async (id: string) => {
+    try {
+      const updated = await updateTeamMember(id, {
+        phone: editPhone.trim() || undefined,
+        whatsapp: editWhatsapp.trim() || undefined,
+        email: editEmail.trim() || undefined
+      });
+      setMembers(prev => prev.map(m => (m.id === id ? updated : m)));
+      setEditingId(null);
+    } catch (err) {
+      console.error('Erreur mise à jour contacts:', err);
+    }
+  };
+
   return (
     <div className="space-y-6 font-sans">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-neutral-200 pb-4">
@@ -92,20 +134,43 @@ export const AdminTeam: React.FC = () => {
             Mon Équipe ({members.length})
           </h1>
           <p className="text-xs text-neutral-500">
-            Créez un code d'accès pour chaque employé. Ils s'en servent pour consulter et traiter les commandes, sans accès aux produits ni aux paramètres. Le lien à leur envoyer est tout en bas de la page.
+            Créez un code d'accès pour chaque employé. Ajoutez son téléphone, WhatsApp et email pour qu'il reçoive automatiquement l'alarme des nouvelles commandes (par email). Le lien de connexion est tout en bas de la page.
           </p>
         </div>
       </div>
 
       {/* Add form */}
-      <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-3 bg-white p-4 rounded-2xl border border-neutral-200 shadow-xs">
-        <input
-          type="text"
-          value={newName}
-          onChange={e => setNewName(e.target.value)}
-          placeholder="Nom de l'employé (ex: Karim)"
-          className="flex-1 p-3 bg-neutral-50 border border-neutral-300 rounded-xl text-sm outline-none focus:border-amber-500"
-        />
+      <form onSubmit={handleAdd} className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-xs space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <input
+            type="text"
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            placeholder="Nom (ex: Karim)"
+            className="p-3 bg-neutral-50 border border-neutral-300 rounded-xl text-sm outline-none focus:border-amber-500"
+          />
+          <input
+            type="tel"
+            value={newPhone}
+            onChange={e => setNewPhone(e.target.value)}
+            placeholder="Téléphone (optionnel)"
+            className="p-3 bg-neutral-50 border border-neutral-300 rounded-xl text-sm outline-none focus:border-amber-500"
+          />
+          <input
+            type="tel"
+            value={newWhatsapp}
+            onChange={e => setNewWhatsapp(e.target.value)}
+            placeholder="WhatsApp (optionnel)"
+            className="p-3 bg-neutral-50 border border-neutral-300 rounded-xl text-sm outline-none focus:border-amber-500"
+          />
+          <input
+            type="email"
+            value={newEmail}
+            onChange={e => setNewEmail(e.target.value)}
+            placeholder="Email (optionnel)"
+            className="p-3 bg-neutral-50 border border-neutral-300 rounded-xl text-sm outline-none focus:border-amber-500"
+          />
+        </div>
         <button
           type="submit"
           disabled={isSubmitting || !newName.trim()}
@@ -124,22 +189,25 @@ export const AdminTeam: React.FC = () => {
               <tr className="bg-neutral-900 text-amber-200 uppercase font-bold text-[11px]">
                 <th className="p-4">Nom</th>
                 <th className="p-4">Code d'accès</th>
+                <th className="p-4">Contacts</th>
                 <th className="p-4 text-center">Statut</th>
                 <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200">
               {isLoading && (
-                <tr><td colSpan={4} className="p-6 text-center text-neutral-400">Chargement...</td></tr>
+                <tr><td colSpan={5} className="p-6 text-center text-neutral-400">Chargement...</td></tr>
               )}
               {!isLoading && members.length === 0 && (
-                <tr><td colSpan={4} className="p-6 text-center text-neutral-400">Aucun membre pour le moment.</td></tr>
+                <tr><td colSpan={5} className="p-6 text-center text-neutral-400">Aucun membre pour le moment.</td></tr>
               )}
               {members.map(member => (
-                <tr key={member.id} className="hover:bg-neutral-50">
-                  <td className="p-4 font-bold text-neutral-900 flex items-center gap-2">
-                    <Users className="w-3.5 h-3.5 text-amber-600" />
-                    {member.name}
+                <tr key={member.id} className="hover:bg-neutral-50 align-top">
+                  <td className="p-4 font-bold text-neutral-900">
+                    <span className="flex items-center gap-2">
+                      <Users className="w-3.5 h-3.5 text-amber-600" />
+                      {member.name}
+                    </span>
                   </td>
                   <td className="p-4">
                     <button
@@ -150,6 +218,51 @@ export const AdminTeam: React.FC = () => {
                       {member.code}
                       {copiedId === member.id ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-neutral-400" />}
                     </button>
+                  </td>
+                  <td className="p-4 min-w-[220px]">
+                    {editingId === member.id ? (
+                      <div className="space-y-1.5">
+                        <input
+                          type="tel"
+                          value={editPhone}
+                          onChange={e => setEditPhone(e.target.value)}
+                          placeholder="Téléphone"
+                          className="w-full p-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-[11px] outline-none focus:border-amber-500"
+                        />
+                        <input
+                          type="tel"
+                          value={editWhatsapp}
+                          onChange={e => setEditWhatsapp(e.target.value)}
+                          placeholder="WhatsApp"
+                          className="w-full p-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-[11px] outline-none focus:border-amber-500"
+                        />
+                        <input
+                          type="email"
+                          value={editEmail}
+                          onChange={e => setEditEmail(e.target.value)}
+                          placeholder="Email"
+                          className="w-full p-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-[11px] outline-none focus:border-amber-500"
+                        />
+                        <div className="flex gap-1.5 pt-1">
+                          <button onClick={() => saveEdit(member.id)} className="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg" title="Enregistrer">
+                            <Save className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={cancelEdit} className="p-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-lg" title="Annuler">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1 text-[11px] text-neutral-600">
+                        {member.phone && <div className="flex items-center gap-1.5"><Phone className="w-3 h-3 text-neutral-400" />{member.phone}</div>}
+                        {member.whatsapp && <div className="flex items-center gap-1.5"><MessageCircle className="w-3 h-3 text-emerald-500" />{member.whatsapp}</div>}
+                        {member.email && <div className="flex items-center gap-1.5"><Mail className="w-3 h-3 text-neutral-400" />{member.email}</div>}
+                        {!member.phone && !member.whatsapp && !member.email && <span className="text-neutral-400">Aucun contact</span>}
+                        <button onClick={() => startEdit(member)} className="text-amber-700 font-bold flex items-center gap-1 mt-1 hover:underline">
+                          <Pencil className="w-3 h-3" /> Modifier
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td className="p-4 text-center">
                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${member.active ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-200 text-neutral-600'}`}>

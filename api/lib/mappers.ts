@@ -202,8 +202,19 @@ export function teamMemberFromDb(row: any): TeamMember {
     name: row.name,
     code: row.code,
     active: !!row.active,
+    phone: row.phone || undefined,
+    whatsapp: row.whatsapp || undefined,
+    email: row.email || undefined,
     createdAt: row.created_at
   };
+}
+export function teamMemberToDb(m: Partial<TeamMember>): Record<string, any> {
+  const row: Record<string, any> = {};
+  if (m.name !== undefined) row.name = m.name;
+  if (m.phone !== undefined) row.phone = m.phone;
+  if (m.whatsapp !== undefined) row.whatsapp = m.whatsapp;
+  if (m.email !== undefined) row.email = m.email;
+  return row;
 }
 
 // --- DÉPENSES ---

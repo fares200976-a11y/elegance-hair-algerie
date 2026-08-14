@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Printer, Phone, MessageSquare, Check, Clock, Truck, Eye, AlertCircle, Filter, UserCheck } from 'lucide-react';
+import { Search, Printer, Phone, MessageSquare, Check, Clock, Truck, Eye, AlertCircle, Filter, UserCheck, Bell } from 'lucide-react';
 import { fetchOrders, updateOrderStatus, fetchTeamMembers } from '../lib/api';
 import { Order, OrderStatus, TeamMember } from '../types';
 import { useShop } from '../context/ShopContext';
 import { useAuth } from '../context/AuthContext';
+import { useOrderAlarm } from '../hooks/useOrderAlarm';
 
 interface AdminOrdersProps {
   onPrintInvoice: (orderId: string) => void;
@@ -47,6 +48,10 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({ onPrintInvoice }) => {
       fetchTeamMembers().then(setTeamMembers).catch(() => {});
     }
   }, [isAdminAuthenticated]);
+
+  const { notificationsEnabled, requestNotificationPermission } = useOrderAlarm(() => {
+    loadOrders();
+  });
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     try {
@@ -110,6 +115,29 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({ onPrintInvoice }) => {
         >
           Actualiser la liste
         </button>
+      </div>
+
+      {/* Alarme sonore : bip automatique + notification navigateur optionnelle */}
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-amber-900 text-xs font-semibold">
+          <Bell className="w-4 h-4" />
+          <span>Un bip sonore retentit automatiquement à chaque nouvelle commande.</span>
+        </div>
+        {!notificationsEnabled && (
+          <button
+            onClick={requestNotificationPermission}
+            className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-amber-200 text-xs font-bold rounded-lg flex items-center gap-1.5 shrink-0"
+          >
+            <Bell className="w-3.5 h-3.5" />
+            Activer les notifications
+          </button>
+        )}
+        {notificationsEnabled && (
+          <span className="text-emerald-700 text-xs font-bold flex items-center gap-1 shrink-0">
+            <Check className="w-3.5 h-3.5" />
+            Notifications activées
+          </span>
+        )}
       </div>
 
       {/* Search & Status Filters */}

@@ -133,6 +133,9 @@ export interface TeamMember {
   name: string;
   code: string;
   active: boolean;
+  phone?: string;
+  whatsapp?: string;
+  email?: string;
   createdAt: string;
 }
 

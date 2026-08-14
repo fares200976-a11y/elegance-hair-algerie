@@ -238,13 +238,30 @@ export async function fetchTeamMembers(): Promise<TeamMember[]> {
   return await res.json();
 }
 
-export async function createTeamMember(name: string): Promise<TeamMember> {
+export async function createTeamMember(input: { name: string; phone?: string; whatsapp?: string; email?: string }): Promise<TeamMember> {
   const res = await fetch(`${API_BASE}/team`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ name })
+    body: JSON.stringify(input)
   });
   if (!res.ok) throw new Error("Erreur création membre d'équipe");
+  return await res.json();
+}
+
+export async function updateTeamMember(id: string, input: Partial<TeamMember>): Promise<TeamMember> {
+  const res = await fetch(`${API_BASE}/team/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(input)
+  });
+  if (!res.ok) throw new Error('Erreur mise à jour du membre');
+  return await res.json();
+}
+
+// Signal léger utilisé par l'alarme sonore (polling fréquent, réponse minimale).
+export async function fetchLatestOrderSignal(): Promise<{ count: number; latestId: string | null; latestCreatedAt: string | null }> {
+  const res = await fetch(`${API_BASE}/orders/latest-signal`, { headers: authHeaders() });
+  if (!res.ok) throw new Error('Erreur signal commandes');
   return await res.json();
 }
 

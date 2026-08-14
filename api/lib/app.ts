@@ -1,5 +1,6 @@
 import express from 'express';
 import { requireAdmin, verifyAdminLogin, requireStaffOrAdmin, issueStaffToken } from './auth.js';
+import { notifyNewOrder } from './notify.js';
 import { getSupabaseAdmin } from './supabaseAdmin.js';
 import * as db from './db.js';
 
@@ -52,10 +53,16 @@ export function createApp() {
   }));
 
   app.post('/api/team', requireAdmin, h(async (req, res) => {
-    const { name } = req.body;
+    const { name, phone, whatsapp, email } = req.body;
     if (!name || !name.trim()) return void res.status(400).json({ message: 'Nom requis' });
-    const member = await db.createTeamMember(name.trim());
+    const member = await db.createTeamMember({ name: name.trim(), phone, whatsapp, email });
     res.status(201).json(member);
+  }));
+
+  app.put('/api/team/:id', requireAdmin, h(async (req, res) => {
+    const updated = await db.updateTeamMember(req.params.id, req.body);
+    if (!updated) return void res.status(404).json({ message: 'Membre non trouvé' });
+    res.json(updated);
   }));
 
   app.put('/api/team/:id/regenerate', requireAdmin, h(async (req, res) => {
@@ -173,6 +180,12 @@ export function createApp() {
     res.json(await db.listOrders());
   }));
 
+  // Endpoint léger pour l'alarme sonore (polling fréquent) : évite de renvoyer toute la liste.
+  app.get('/api/orders/latest-signal', requireStaffOrAdmin, h(async (req, res) => {
+    const signal = await db.getLatestOrderSignal();
+    res.json(signal);
+  }));
+
   // Volontairement public : utilisé par la page de confirmation de commande et la facture
   // juste après l'achat (le client n'est pas connecté).
   app.get('/api/orders/:id', h(async (req, res) => {
@@ -204,6 +217,11 @@ export function createApp() {
     }
     const order = await db.createOrder({ customerName, customerPhone, wilayaCode, wilayaName, commune, address, deliveryType, items, notes });
     res.status(201).json(order);
+
+    // Notification (email) — après la réponse, sans jamais bloquer ni faire échouer la commande.
+    db.listNotificationRecipientEmails()
+      .then(emails => notifyNewOrder(order, emails))
+      .catch(err => console.error('Erreur notification nouvelle commande:', err));
   }));
 
   app.put('/api/orders/:id/status', requireStaffOrAdmin, h(async (req, res) => {

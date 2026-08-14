@@ -7,7 +7,7 @@ import {
   reviewFromDb,
   stockMovementFromDb,
   settingsFromDb, settingsToDb,
-  teamMemberFromDb,
+  teamMemberFromDb, teamMemberToDb,
   expenseFromDb, expenseToDb
 } from './mappers.js';
 import { Product, Category, Order, Wilaya, Review, StockMovement, ShopSettings, Customer, TeamMember, Expense } from '../../src/types';
@@ -171,6 +171,22 @@ export async function getOrderByIdOrNumber(idOrNumber: string): Promise<Order | 
   const { data, error } = await sb.from('orders').select('*').or(`id.eq.${idOrNumber},order_number.eq.${idOrNumber}`).maybeSingle();
   if (error) throw error;
   return data ? orderFromDb(data) : null;
+}
+
+// Signal léger pour le polling de l'alarme sonore (évite de renvoyer toute la liste des commandes).
+export async function getLatestOrderSignal(): Promise<{ count: number; latestId: string | null; latestCreatedAt: string | null }> {
+  const sb = getSupabaseAdmin();
+  const { count, error: countError } = await sb.from('orders').select('*', { count: 'exact', head: true });
+  if (countError) throw countError;
+
+  const { data, error } = await sb.from('orders').select('id, created_at').order('created_at', { ascending: false }).limit(1);
+  if (error) throw error;
+
+  return {
+    count: count || 0,
+    latestId: data?.[0]?.id || null,
+    latestCreatedAt: data?.[0]?.created_at || null
+  };
 }
 
 export async function trackOrder(orderNumber: string, phone: string): Promise<Order | null> {
@@ -439,7 +455,7 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
   return (data || []).map(teamMemberFromDb);
 }
 
-export async function createTeamMember(name: string): Promise<TeamMember> {
+export async function createTeamMember(input: { name: string; phone?: string; whatsapp?: string; email?: string }): Promise<TeamMember> {
   const sb = getSupabaseAdmin();
   let code = generateTeamCode();
   // Évite (rarement) une collision de code.
@@ -448,8 +464,25 @@ export async function createTeamMember(name: string): Promise<TeamMember> {
     if (!existing) break;
     code = generateTeamCode();
   }
-  const { data, error } = await sb.from('team_members').insert({ name, code, active: true }).select().single();
+  const { data, error } = await sb.from('team_members').insert({
+    name: input.name,
+    code,
+    active: true,
+    phone: input.phone || null,
+    whatsapp: input.whatsapp || null,
+    email: input.email || null
+  }).select().single();
   if (error) throw error;
+  return teamMemberFromDb(data);
+}
+
+export async function updateTeamMember(id: string, input: Partial<TeamMember>): Promise<TeamMember | null> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb.from('team_members').update(teamMemberToDb(input)).eq('id', id).select().single();
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw error;
+  }
   return teamMemberFromDb(data);
 }
 
@@ -487,6 +520,20 @@ export async function verifyTeamCode(code: string): Promise<TeamMember | null> {
   const { data, error } = await sb.from('team_members').select('*').eq('code', cleanCode).eq('active', true).maybeSingle();
   if (error) throw error;
   return data ? teamMemberFromDb(data) : null;
+}
+
+// Emails à notifier pour une nouvelle commande : boutique (settings) + équipe active ayant un email.
+export async function listNotificationRecipientEmails(): Promise<string[]> {
+  const sb = getSupabaseAdmin();
+  const emails = new Set<string>();
+
+  const { data: settingsRow } = await sb.from('settings').select('email').eq('id', 1).maybeSingle();
+  if (settingsRow?.email) emails.add(settingsRow.email);
+
+  const { data: members } = await sb.from('team_members').select('email').eq('active', true);
+  (members || []).forEach((m: any) => { if (m.email) emails.add(m.email); });
+
+  return Array.from(emails);
 }
 
 // --- DÉPENSES / FACTURES D'ACHAT ---
