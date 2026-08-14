@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, RefreshCw, Trash2, Power, Copy, Check } from 'lucide-react';
+import { Users, Plus, RefreshCw, Trash2, Power, Copy, Check, Link as LinkIcon, ExternalLink } from 'lucide-react';
 import { fetchTeamMembers, createTeamMember, regenerateTeamMemberCode, setTeamMemberActive, deleteTeamMember } from '../lib/api';
 import { TeamMember } from '../types';
 
@@ -9,6 +9,15 @@ export const AdminTeam: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const staffUrl = `${window.location.origin}/staff`;
+
+  const handleCopyStaffLink = () => {
+    navigator.clipboard?.writeText(staffUrl).catch(() => {});
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 1500);
+  };
 
   const load = async () => {
     setIsLoading(true);
@@ -83,7 +92,7 @@ export const AdminTeam: React.FC = () => {
             Mon Équipe ({members.length})
           </h1>
           <p className="text-xs text-neutral-500">
-            Créez un code d'accès pour chaque employé. Ils l'utilisent sur <span className="font-mono font-bold">/staff</span> pour consulter et traiter les commandes, sans accès aux produits ni aux paramètres.
+            Créez un code d'accès pour chaque employé. Ils s'en servent pour consulter et traiter les commandes, sans accès aux produits ni aux paramètres. Le lien à leur envoyer est tout en bas de la page.
           </p>
         </div>
       </div>
@@ -174,6 +183,37 @@ export const AdminTeam: React.FC = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Lien à envoyer à l'équipe */}
+      <div className="bg-neutral-900 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+            <LinkIcon className="w-5 h-5 text-amber-400" />
+          </div>
+          <div>
+            <span className="text-amber-300 text-xs font-bold uppercase tracking-wide block">Lien de connexion équipe</span>
+            <span className="text-white font-mono text-sm break-all">{staffUrl}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleCopyStaffLink}
+            className="px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold rounded-xl flex items-center gap-2"
+          >
+            {linkCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+            {linkCopied ? 'Copié !' : 'Copier le lien'}
+          </button>
+          <a
+            href="/staff"
+            target="_blank"
+            rel="noreferrer"
+            className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold rounded-xl flex items-center gap-2"
+          >
+            <ExternalLink className="w-4 h-4" />
+            Ouvrir
+          </a>
         </div>
       </div>
     </div>
