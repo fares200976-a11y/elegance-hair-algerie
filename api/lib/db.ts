@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from './supabaseAdmin';
+import { getSupabaseAdmin } from './supabaseAdmin.js';
 import {
   categoryFromDb, categoryToDb,
   productFromDb, productToDb,
@@ -7,7 +7,7 @@ import {
   reviewFromDb,
   stockMovementFromDb,
   settingsFromDb, settingsToDb
-} from './mappers';
+} from './mappers.js';
 import { Product, Category, Order, Wilaya, Review, StockMovement, ShopSettings, Customer } from '../../src/types';
 
 // --- CATEGORIES ---

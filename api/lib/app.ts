@@ -1,7 +1,7 @@
 import express from 'express';
-import { requireAdmin, verifyAdminLogin } from './auth';
-import { getSupabaseAdmin } from './supabaseAdmin';
-import * as db from './db';
+import { requireAdmin, verifyAdminLogin } from './auth.js';
+import { getSupabaseAdmin } from './supabaseAdmin.js';
+import * as db from './db.js';
 
 export function createApp() {
   const app = express();
