@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAdmin, verifyAdminLogin } from './auth.js';
+import { requireAdmin, verifyAdminLogin, requireStaffOrAdmin, issueStaffToken } from './auth.js';
 import { getSupabaseAdmin } from './supabaseAdmin.js';
 import * as db from './db.js';
 
@@ -34,6 +34,62 @@ export function createApp() {
       return void res.status(401).json({ success: false, message: 'Email ou mot de passe incorrect' });
     }
     res.json({ success: true, token: result.token, user: { name: 'Administrateur', email: result.email, role: 'admin' } });
+  }));
+
+  // Connexion Équipe (staff) — juste un code, accès limité aux commandes.
+  app.post('/api/team/login', h(async (req, res) => {
+    const { code } = req.body;
+    if (!code) return void res.status(400).json({ success: false, message: 'Code requis' });
+    const member = await db.verifyTeamCode(String(code));
+    if (!member) return void res.status(401).json({ success: false, message: 'Code invalide ou inactif' });
+    const token = issueStaffToken(member.id, member.name);
+    res.json({ success: true, token, user: { name: member.name, role: 'staff' } });
+  }));
+
+  // Équipe — gestion réservée à l'admin
+  app.get('/api/team', requireAdmin, h(async (req, res) => {
+    res.json(await db.listTeamMembers());
+  }));
+
+  app.post('/api/team', requireAdmin, h(async (req, res) => {
+    const { name } = req.body;
+    if (!name || !name.trim()) return void res.status(400).json({ message: 'Nom requis' });
+    const member = await db.createTeamMember(name.trim());
+    res.status(201).json(member);
+  }));
+
+  app.put('/api/team/:id/regenerate', requireAdmin, h(async (req, res) => {
+    const updated = await db.regenerateTeamMemberCode(req.params.id);
+    if (!updated) return void res.status(404).json({ message: 'Membre non trouvé' });
+    res.json(updated);
+  }));
+
+  app.put('/api/team/:id/active', requireAdmin, h(async (req, res) => {
+    const updated = await db.setTeamMemberActive(req.params.id, !!req.body.active);
+    if (!updated) return void res.status(404).json({ message: 'Membre non trouvé' });
+    res.json(updated);
+  }));
+
+  app.delete('/api/team/:id', requireAdmin, h(async (req, res) => {
+    await db.deleteTeamMember(req.params.id);
+    res.json({ success: true });
+  }));
+
+  // Dépenses / Factures d'achat — réservé à l'admin
+  app.get('/api/expenses', requireAdmin, h(async (req, res) => {
+    res.json(await db.listExpenses());
+  }));
+
+  app.post('/api/expenses', requireAdmin, h(async (req, res) => {
+    const { title, amount } = req.body;
+    if (!title || !amount) return void res.status(400).json({ message: 'Titre et montant requis' });
+    const expense = await db.createExpense(req.body);
+    res.status(201).json(expense);
+  }));
+
+  app.delete('/api/expenses/:id', requireAdmin, h(async (req, res) => {
+    await db.deleteExpense(req.params.id);
+    res.json({ success: true });
   }));
 
   // Settings
@@ -113,7 +169,7 @@ export function createApp() {
   }));
 
   // Orders
-  app.get('/api/orders', requireAdmin, h(async (req, res) => {
+  app.get('/api/orders', requireStaffOrAdmin, h(async (req, res) => {
     res.json(await db.listOrders());
   }));
 
@@ -127,8 +183,14 @@ export function createApp() {
 
   app.post('/api/orders/track', h(async (req, res) => {
     const { orderNumber, phone } = req.body;
-    if (!orderNumber || !phone) {
-      return void res.status(400).json({ message: 'Veuillez saisir le numéro de commande et votre téléphone' });
+    if (!phone) {
+      return void res.status(400).json({ message: 'Veuillez saisir votre numéro de téléphone' });
+    }
+    if (!orderNumber) {
+      // Suivi simplifié : juste le téléphone, renvoie toutes les commandes du client.
+      const orders = await db.trackOrdersByPhone(phone);
+      if (!orders.length) return void res.status(404).json({ message: 'Aucune commande trouvée pour ce numéro' });
+      return void res.json(orders);
     }
     const order = await db.trackOrder(orderNumber, phone);
     if (!order) return void res.status(404).json({ message: 'Aucune commande trouvée pour ces informations' });
@@ -144,8 +206,11 @@ export function createApp() {
     res.status(201).json(order);
   }));
 
-  app.put('/api/orders/:id/status', requireAdmin, h(async (req, res) => {
-    const updated = await db.updateOrderStatus(req.params.id, req.body.status);
+  app.put('/api/orders/:id/status', requireStaffOrAdmin, h(async (req, res) => {
+    const actor = (req as any).actor as { role: 'admin' | 'staff'; name: string };
+    // Le staff signe automatiquement avec son nom ; l'admin peut préciser un nom (dropdown équipe) ou laisser vide.
+    const handledByName = actor.role === 'staff' ? actor.name : (req.body.handledByName || undefined);
+    const updated = await db.updateOrderStatus(req.params.id, req.body.status, handledByName);
     if (!updated) return void res.status(404).json({ message: 'Commande non trouvée' });
     res.json(updated);
   }));
@@ -192,9 +257,12 @@ export function createApp() {
   const ALLOWED_EXT: Record<string, string> = {
     '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif'
   };
+  const ALLOWED_BUCKETS = new Set(['products', 'invoices']);
   app.post('/api/upload', requireAdmin, h(async (req, res) => {
-    const { imageBase64, filename } = req.body;
+    const { imageBase64, filename, bucket } = req.body;
     if (!imageBase64) return void res.status(400).json({ message: 'Image base64 requise' });
+
+    const targetBucket = ALLOWED_BUCKETS.has(bucket) ? bucket : 'products';
 
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
@@ -204,7 +272,7 @@ export function createApp() {
     const cleanName = `img_${Date.now()}_${Math.random().toString(36).substring(2, 7)}${ext}`;
 
     const sb = getSupabaseAdmin();
-    const { error } = await sb.storage.from('products').upload(cleanName, buffer, {
+    const { error } = await sb.storage.from(targetBucket).upload(cleanName, buffer, {
       contentType: ALLOWED_EXT[ext],
       upsert: false
     });
@@ -213,7 +281,7 @@ export function createApp() {
       return void res.status(500).json({ message: "Échec de l'upload d'image" });
     }
 
-    const { data: publicUrlData } = sb.storage.from('products').getPublicUrl(cleanName);
+    const { data: publicUrlData } = sb.storage.from(targetBucket).getPublicUrl(cleanName);
     res.json({ success: true, url: publicUrlData.publicUrl });
   }));
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, AlertCircle, Printer } from 'lucide-react';
-import { trackOrder } from '../lib/api';
+import { Search, AlertCircle, Printer, ChevronRight } from 'lucide-react';
+import { trackOrder, trackOrdersByPhone } from '../lib/api';
 import { Order, OrderStatus } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -19,6 +19,7 @@ export const OrderTrackingPage: React.FC<OrderTrackingPageProps> = ({
   const [orderNumber, setOrderNumber] = useState(initialOrderNumber);
   const [phone, setPhone] = useState(initialPhone);
   const [trackedOrder, setTrackedOrder] = useState<Order | null>(null);
+  const [orderList, setOrderList] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -34,20 +35,32 @@ export const OrderTrackingPage: React.FC<OrderTrackingPageProps> = ({
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orderNumber || !phone) {
-      setErrorMsg(t('trackingInputPrompt'));
+    if (!phone) {
+      setErrorMsg(isAr ? 'يرجى إدخال رقم هاتفك' : 'Veuillez saisir votre numéro de téléphone');
       return;
     }
 
     setIsLoading(true);
     setErrorMsg(null);
     setTrackedOrder(null);
+    setOrderList([]);
 
     try {
-      const order = await trackOrder(orderNumber, phone);
-      setTrackedOrder(order);
+      if (orderNumber.trim()) {
+        // Numéro de commande + téléphone : résultat précis, comme avant.
+        const order = await trackOrder(orderNumber.trim(), phone);
+        setTrackedOrder(order);
+      } else {
+        // Suivi simplifié : juste le téléphone, on liste toutes les commandes du client.
+        const orders = await trackOrdersByPhone(phone);
+        if (orders.length === 1) {
+          setTrackedOrder(orders[0]);
+        } else {
+          setOrderList(orders);
+        }
+      }
     } catch (err: any) {
-      setErrorMsg(err.message || (isAr ? 'لم يتم العثور على الطلب. تحقق من رقم الطلب ورقم الهاتف.' : 'Commande introuvable. Vérifiez votre numéro de commande.'));
+      setErrorMsg(err.message || (isAr ? 'لم يتم العثور على أي طلب لهذا الرقم.' : 'Aucune commande trouvée pour ce numéro.'));
     } finally {
       setIsLoading(false);
     }
@@ -77,41 +90,38 @@ export const OrderTrackingPage: React.FC<OrderTrackingPageProps> = ({
           {t('trackingTitle')}
         </h1>
         <p className="text-sm text-neutral-600">
-          {t('trackingSubtitle')}
+          {isAr ? 'أدخل رقم هاتفك فقط لعرض جميع طلباتك.' : 'Saisissez juste votre numéro de téléphone pour voir toutes vos commandes.'}
         </p>
       </div>
 
       {/* Search Form Card */}
       <div className="bg-white p-6 sm:p-8 rounded-3xl border border-neutral-200 shadow-sm max-w-2xl mx-auto">
         <form onSubmit={handleSearch} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-neutral-800 block mb-1">
-                {t('orderNumberLabel')}
-              </label>
-              <input
-                type="text"
-                required
-                value={orderNumber}
-                onChange={e => setOrderNumber(e.target.value)}
-                placeholder="Ex: CMD-2026-000001"
-                className="w-full p-3 bg-neutral-50 border border-neutral-300 rounded-xl text-sm outline-none focus:border-amber-500 uppercase font-mono"
-              />
-            </div>
+          <div>
+            <label className="text-xs font-bold text-neutral-800 block mb-1">
+              {t('phoneNumberLabel')}
+            </label>
+            <input
+              type="tel"
+              required
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="Ex: 0550123456"
+              className="w-full p-3 bg-neutral-50 border border-neutral-300 rounded-xl text-sm outline-none focus:border-amber-500"
+            />
+          </div>
 
-            <div>
-              <label className="text-xs font-bold text-neutral-800 block mb-1">
-                {t('phoneNumberLabel')}
-              </label>
-              <input
-                type="tel"
-                required
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                placeholder="Ex: 0550123456"
-                className="w-full p-3 bg-neutral-50 border border-neutral-300 rounded-xl text-sm outline-none focus:border-amber-500"
-              />
-            </div>
+          <div>
+            <label className="text-xs font-bold text-neutral-800 block mb-1">
+              {t('orderNumberLabel')} <span className="text-neutral-400 font-normal normal-case">({isAr ? 'اختياري' : 'optionnel'})</span>
+            </label>
+            <input
+              type="text"
+              value={orderNumber}
+              onChange={e => setOrderNumber(e.target.value)}
+              placeholder="Ex: CMD-2026-000001"
+              className="w-full p-3 bg-neutral-50 border border-neutral-300 rounded-xl text-sm outline-none focus:border-amber-500 uppercase font-mono"
+            />
           </div>
 
           <button
@@ -137,6 +147,37 @@ export const OrderTrackingPage: React.FC<OrderTrackingPageProps> = ({
           </div>
         )}
       </div>
+
+      {/* MULTIPLE ORDERS LIST (suivi par téléphone seul) */}
+      {orderList.length > 0 && (
+        <div className="bg-white rounded-3xl border border-neutral-200 shadow-xl overflow-hidden max-w-2xl mx-auto animate-fadeIn">
+          <div className="p-5 border-b border-neutral-200">
+            <h3 className="font-serif font-extrabold text-neutral-900">
+              {isAr ? `${orderList.length} طلب موجود لهذا الرقم` : `${orderList.length} commande(s) trouvée(s) pour ce numéro`}
+            </h3>
+          </div>
+          <div className="divide-y divide-neutral-200">
+            {orderList.map(order => (
+              <button
+                key={order.id}
+                onClick={() => { setTrackedOrder(order); setOrderList([]); }}
+                className="w-full text-left p-4 hover:bg-neutral-50 flex items-center justify-between gap-3"
+              >
+                <div>
+                  <span className="font-mono font-bold text-amber-900 text-sm block">{order.orderNumber}</span>
+                  <span className="text-xs text-neutral-500">
+                    {new Date(order.createdAt).toLocaleDateString('fr-FR')} — {order.status}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-neutral-900 text-sm">{order.totalAmount.toLocaleString('fr-FR')} DA</span>
+                  <ChevronRight className="w-4 h-4 text-neutral-400" />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* TRACKED ORDER RESULT DETAILS */}
       {trackedOrder && (
@@ -248,4 +289,3 @@ export const OrderTrackingPage: React.FC<OrderTrackingPageProps> = ({
     </div>
   );
 };
-

@@ -23,6 +23,14 @@ interface AdminJwtPayload {
   email: string;
 }
 
+interface StaffJwtPayload {
+  role: 'staff';
+  teamMemberId: string;
+  name: string;
+}
+
+type AnyJwtPayload = AdminJwtPayload | StaffJwtPayload;
+
 export function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -40,6 +48,29 @@ export function requireAdmin(req: express.Request, res: express.Response, next: 
   }
 }
 
+// Autorise l'admin OU un membre de l'équipe (accès limité aux commandes).
+// Attache req.actor = { role, name } pour que la route sache qui a agi.
+export function requireStaffOrAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Authentification requise' });
+  }
+  const token = authHeader.slice('Bearer '.length);
+  try {
+    const payload = jwt.verify(token, JWT_SECRET as string) as AnyJwtPayload;
+    if (payload.role !== 'admin' && payload.role !== 'staff') {
+      return res.status(403).json({ message: 'Accès refusé' });
+    }
+    (req as any).actor =
+      payload.role === 'admin'
+        ? { role: 'admin', name: 'Administrateur' }
+        : { role: 'staff', name: (payload as StaffJwtPayload).name };
+    next();
+  } catch {
+    return res.status(401).json({ message: 'Token invalide ou expiré' });
+  }
+}
+
 export async function verifyAdminLogin(email: string, password: string): Promise<{ token: string; email: string } | null> {
   const emailMatches = email === ADMIN_EMAIL || email === 'admin';
   const passwordMatches = await bcrypt.compare(password, ADMIN_PASSWORD_HASH as string);
@@ -49,4 +80,11 @@ export async function verifyAdminLogin(email: string, password: string): Promise
     expiresIn: '24h'
   });
   return { token, email: ADMIN_EMAIL };
+}
+
+// Génère un token staff à partir d'un membre d'équipe déjà vérifié (voir db.verifyTeamCode).
+export function issueStaffToken(teamMemberId: string, name: string): string {
+  return jwt.sign({ role: 'staff', teamMemberId, name } as StaffJwtPayload, JWT_SECRET as string, {
+    expiresIn: '24h'
+  });
 }

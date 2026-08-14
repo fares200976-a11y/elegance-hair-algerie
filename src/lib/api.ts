@@ -1,10 +1,10 @@
-import { Product, Category, Order, Wilaya, Review, StockMovement, ShopSettings } from '../types';
+import { Product, Category, Order, Wilaya, Review, StockMovement, ShopSettings, TeamMember, Expense } from '../types';
 
 const API_BASE = '/api';
 
-// Ajoute le token JWT admin (stocké au login) sur les requêtes qui en ont besoin.
+// Ajoute le token JWT (admin en priorité, sinon staff) sur les requêtes qui en ont besoin.
 function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('elegance_admin_token');
+  const token = localStorage.getItem('elegance_admin_token') || localStorage.getItem('elegance_staff_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -105,25 +105,39 @@ export async function trackOrder(orderNumber: string, phone: string): Promise<Or
   return await res.json();
 }
 
+// Suivi simplifié : juste le numéro de téléphone, renvoie toutes les commandes du client.
+export async function trackOrdersByPhone(phone: string): Promise<Order[]> {
+  const res = await fetch(`${API_BASE}/orders/track`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || 'Aucune commande trouvée pour ce numéro');
+  }
+  return await res.json();
+}
+
 export async function fetchOrders(): Promise<Order[]> {
   const res = await fetch(`${API_BASE}/orders`, { headers: authHeaders() });
   return await res.json();
 }
 
-export async function updateOrderStatus(orderId: string, status: string): Promise<Order> {
+export async function updateOrderStatus(orderId: string, status: string, handledByName?: string): Promise<Order> {
   const res = await fetch(`${API_BASE}/orders/${orderId}/status`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ status })
+    body: JSON.stringify({ status, handledByName })
   });
   return await res.json();
 }
 
-export async function uploadProductImage(imageBase64: string, filename?: string): Promise<string> {
+export async function uploadProductImage(imageBase64: string, filename?: string, bucket?: 'products' | 'invoices'): Promise<string> {
   const res = await fetch(`${API_BASE}/upload`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ imageBase64, filename })
+    body: JSON.stringify({ imageBase64, filename, bucket })
   });
   if (!res.ok) throw new Error('Erreur upload image');
   const data = await res.json();
@@ -205,4 +219,73 @@ export async function submitReview(review: { productId: string; customerName: st
 export async function fetchCustomers(): Promise<any[]> {
   const res = await fetch(`${API_BASE}/customers`, { headers: authHeaders() });
   return await res.json();
+}
+
+// --- ÉQUIPE ---
+export async function staffLogin(code: string): Promise<{ success: boolean; token?: string; name?: string; message?: string }> {
+  const res = await fetch(`${API_BASE}/team/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code })
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) return { success: false, message: data.message || 'Code invalide' };
+  return { success: true, token: data.token, name: data.user?.name };
+}
+
+export async function fetchTeamMembers(): Promise<TeamMember[]> {
+  const res = await fetch(`${API_BASE}/team`, { headers: authHeaders() });
+  return await res.json();
+}
+
+export async function createTeamMember(name: string): Promise<TeamMember> {
+  const res = await fetch(`${API_BASE}/team`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ name })
+  });
+  if (!res.ok) throw new Error("Erreur création membre d'équipe");
+  return await res.json();
+}
+
+export async function regenerateTeamMemberCode(id: string): Promise<TeamMember> {
+  const res = await fetch(`${API_BASE}/team/${id}/regenerate`, { method: 'PUT', headers: authHeaders() });
+  if (!res.ok) throw new Error('Erreur régénération du code');
+  return await res.json();
+}
+
+export async function setTeamMemberActive(id: string, active: boolean): Promise<TeamMember> {
+  const res = await fetch(`${API_BASE}/team/${id}/active`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ active })
+  });
+  if (!res.ok) throw new Error('Erreur mise à jour du membre');
+  return await res.json();
+}
+
+export async function deleteTeamMember(id: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/team/${id}`, { method: 'DELETE', headers: authHeaders() });
+  return res.ok;
+}
+
+// --- DÉPENSES / FACTURES D'ACHAT ---
+export async function fetchExpenses(): Promise<Expense[]> {
+  const res = await fetch(`${API_BASE}/expenses`, { headers: authHeaders() });
+  return await res.json();
+}
+
+export async function createExpense(expense: Partial<Expense>): Promise<Expense> {
+  const res = await fetch(`${API_BASE}/expenses`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(expense)
+  });
+  if (!res.ok) throw new Error('Erreur création dépense');
+  return await res.json();
+}
+
+export async function deleteExpense(id: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/expenses/${id}`, { method: 'DELETE', headers: authHeaders() });
+  return res.ok;
 }

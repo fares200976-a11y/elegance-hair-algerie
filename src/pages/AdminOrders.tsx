@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Printer, Phone, MessageSquare, Check, Clock, Truck, Eye, AlertCircle, Filter } from 'lucide-react';
-import { fetchOrders, updateOrderStatus } from '../lib/api';
-import { Order, OrderStatus } from '../types';
+import { Search, Printer, Phone, MessageSquare, Check, Clock, Truck, Eye, AlertCircle, Filter, UserCheck } from 'lucide-react';
+import { fetchOrders, updateOrderStatus, fetchTeamMembers } from '../lib/api';
+import { Order, OrderStatus, TeamMember } from '../types';
 import { useShop } from '../context/ShopContext';
+import { useAuth } from '../context/AuthContext';
 
 interface AdminOrdersProps {
   onPrintInvoice: (orderId: string) => void;
@@ -10,7 +11,9 @@ interface AdminOrdersProps {
 
 export const AdminOrders: React.FC<AdminOrdersProps> = ({ onPrintInvoice }) => {
   const { settings } = useShop();
+  const { isAdminAuthenticated } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -40,16 +43,31 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({ onPrintInvoice }) => {
 
   useEffect(() => {
     loadOrders();
-  }, []);
+    if (isAdminAuthenticated) {
+      fetchTeamMembers().then(setTeamMembers).catch(() => {});
+    }
+  }, [isAdminAuthenticated]);
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     try {
-      await updateOrderStatus(orderId, newStatus);
+      const updated = await updateOrderStatus(orderId, newStatus);
       setOrders(prev =>
-        prev.map(o => (o.id === orderId ? { ...o, status: newStatus } : o))
+        prev.map(o => (o.id === orderId ? { ...o, status: newStatus, handledByName: updated.handledByName ?? o.handledByName } : o))
       );
     } catch (err) {
       console.error('Erreur update status:', err);
+    }
+  };
+
+  // Réservé à l'admin : associer manuellement un membre de l'équipe à la commande.
+  const handleAssignHandler = async (orderId: string, handledByName: string) => {
+    try {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+      await updateOrderStatus(orderId, order.status, handledByName || undefined);
+      setOrders(prev => prev.map(o => (o.id === orderId ? { ...o, handledByName: handledByName || undefined } : o)));
+    } catch (err) {
+      console.error('Erreur assignation employé:', err);
     }
   };
 
@@ -136,6 +154,7 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({ onPrintInvoice }) => {
                 <th className="p-4">Wilaya & Commune</th>
                 <th className="p-4 text-right">Montant Total</th>
                 <th className="p-4 text-center">Statut Commande</th>
+                <th className="p-4">Traité par</th>
                 <th className="p-4 text-right">Actions & Facture</th>
               </tr>
             </thead>
@@ -188,6 +207,27 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({ onPrintInvoice }) => {
                         </option>
                       ))}
                     </select>
+                  </td>
+                  <td className="p-4">
+                    {isAdminAuthenticated ? (
+                      <select
+                        value={order.handledByName || ''}
+                        onChange={e => handleAssignHandler(order.id, e.target.value)}
+                        className="bg-neutral-50 border border-neutral-300 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-neutral-800 outline-none"
+                      >
+                        <option value="">— Non assigné —</option>
+                        {teamMembers.map(m => (
+                          <option key={m.id} value={m.name}>{m.name}</option>
+                        ))}
+                      </select>
+                    ) : order.handledByName ? (
+                      <span className="text-neutral-700 font-semibold flex items-center gap-1">
+                        <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        {order.handledByName}
+                      </span>
+                    ) : (
+                      <span className="text-neutral-400">—</span>
+                    )}
                   </td>
                   <td className="p-4 text-right space-x-2 whitespace-nowrap">
                     <button

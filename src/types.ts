@@ -80,6 +80,7 @@ export interface Order {
   status: OrderStatus;
   notes?: string;
   items: OrderItem[];
+  handledByName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -124,6 +125,26 @@ export interface StockMovement {
   newStock: number;
   reason: 'Entrée stock' | 'Vente' | 'Retour' | 'Perte/Casse' | 'Correction';
   adminName: string;
+  createdAt: string;
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  code: string;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface Expense {
+  id: string;
+  title: string;
+  supplier?: string;
+  amount: number;
+  category: string;
+  invoiceUrl?: string;
+  notes?: string;
+  expenseDate: string;
   createdAt: string;
 }
 

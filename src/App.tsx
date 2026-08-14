@@ -30,9 +30,12 @@ import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminProducts } from './pages/AdminProducts';
 import { AdminOrders } from './pages/AdminOrders';
+import { AdminTeam } from './pages/AdminTeam';
+import { AdminExpenses } from './pages/AdminExpenses';
+import { StaffLoginPage } from './pages/StaffLoginPage';
 
 import { Product, Order } from './types';
-import { LayoutDashboard, Package, ShoppingBag, LogOut, Store, Check, X } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, LogOut, Store, Check, X, Users, Receipt } from 'lucide-react';
 
 const ToastNotification: React.FC = () => {
   const { toastMessage, clearToast } = useCart();
@@ -221,7 +224,7 @@ const PrintInvoiceRoute: React.FC = () => {
 // Admin Section Component
 const AdminLayout: React.FC = () => {
   const { isAdminAuthenticated, logoutAdmin } = useAuth();
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'orders'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'orders' | 'team' | 'expenses'>('dashboard');
   const navigate = useNavigate();
 
   if (!isAdminAuthenticated) {
@@ -284,6 +287,30 @@ const AdminLayout: React.FC = () => {
                 <ShoppingBag className="w-4 h-4" />
                 <span className="hidden sm:inline">Commandes</span>
               </button>
+
+              <button
+                onClick={() => setAdminTab('team')}
+                className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-colors ${
+                  adminTab === 'team'
+                    ? 'bg-amber-500 text-neutral-950 shadow-xs'
+                    : 'text-neutral-300 hover:bg-neutral-800'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span className="hidden sm:inline">Équipe</span>
+              </button>
+
+              <button
+                onClick={() => setAdminTab('expenses')}
+                className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-colors ${
+                  adminTab === 'expenses'
+                    ? 'bg-amber-500 text-neutral-950 shadow-xs'
+                    : 'text-neutral-300 hover:bg-neutral-800'
+                }`}
+              >
+                <Receipt className="w-4 h-4" />
+                <span className="hidden sm:inline">Dépenses</span>
+              </button>
             </nav>
 
             <div className="flex items-center gap-2">
@@ -316,6 +343,66 @@ const AdminLayout: React.FC = () => {
         {adminTab === 'orders' && (
           <AdminOrders onPrintInvoice={orderId => navigate(`/facture/${orderId}`)} />
         )}
+        {adminTab === 'team' && <AdminTeam />}
+        {adminTab === 'expenses' && <AdminExpenses />}
+      </main>
+    </div>
+  );
+};
+
+// Espace Équipe (staff) — accès limité aux commandes uniquement, via code.
+const StaffLayout: React.FC = () => {
+  const { isStaffAuthenticated, staffName, logoutStaff } = useAuth();
+  const navigate = useNavigate();
+
+  if (!isStaffAuthenticated) {
+    return <StaffLoginPage />;
+  }
+
+  return (
+    <div className="min-h-screen bg-neutral-100 font-sans pb-16">
+      <header className="bg-neutral-900 text-white border-b border-amber-500/30 sticky top-0 z-30 shadow-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-amber-500 text-neutral-950 flex items-center justify-center font-serif font-bold">
+                É
+              </div>
+              <div>
+                <span className="font-serif font-bold text-base text-white block leading-none">
+                  ÉLÉGANCE HAIR
+                </span>
+                <span className="text-amber-400 text-[10px] uppercase font-sans font-semibold tracking-wider">
+                  Espace Équipe — {staffName}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/')}
+                className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                title="Voir le site client"
+              >
+                <Store className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Boutique</span>
+              </button>
+
+              <button
+                onClick={logoutStaff}
+                className="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 border border-rose-500/30"
+                title="Déconnexion"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Quitter</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        <AdminOrders onPrintInvoice={orderId => navigate(`/facture/${orderId}`)} />
       </main>
     </div>
   );
@@ -372,7 +459,7 @@ const MainContent: React.FC = () => {
     }
   };
 
-  const isAdminRoute = pathname.startsWith('/admin');
+  const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/staff');
   const isInvoiceRoute = pathname.startsWith('/facture');
 
   return (
@@ -434,6 +521,7 @@ const MainContent: React.FC = () => {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/facture/:orderId" element={<PrintInvoiceRoute />} />
           <Route path="/admin/*" element={<AdminLayout />} />
+          <Route path="/staff/*" element={<StaffLayout />} />
         </Routes>
       </div>
 

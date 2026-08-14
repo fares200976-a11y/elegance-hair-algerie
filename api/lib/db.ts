@@ -6,9 +6,11 @@ import {
   orderFromDb,
   reviewFromDb,
   stockMovementFromDb,
-  settingsFromDb, settingsToDb
+  settingsFromDb, settingsToDb,
+  teamMemberFromDb,
+  expenseFromDb, expenseToDb
 } from './mappers.js';
-import { Product, Category, Order, Wilaya, Review, StockMovement, ShopSettings, Customer } from '../../src/types';
+import { Product, Category, Order, Wilaya, Review, StockMovement, ShopSettings, Customer, TeamMember, Expense } from '../../src/types';
 
 // --- CATEGORIES ---
 export async function listCategories(): Promise<Category[]> {
@@ -183,6 +185,20 @@ export async function trackOrder(orderNumber: string, phone: string): Promise<Or
   return match ? orderFromDb(match) : null;
 }
 
+// Suivi client par numéro de téléphone seul : renvoie toutes les commandes liées à ce numéro.
+export async function trackOrdersByPhone(phone: string): Promise<Order[]> {
+  const sb = getSupabaseAdmin();
+  const cleanPhoneSuffix = phone.trim().replace(/\s+/g, '').slice(-8);
+  if (cleanPhoneSuffix.length < 8) return [];
+
+  const { data, error } = await sb.from('orders').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+
+  return (data || [])
+    .filter(o => o.customer_phone.replace(/\s+/g, '').endsWith(cleanPhoneSuffix))
+    .map(orderFromDb);
+}
+
 export async function createOrder(input: {
   customerName: string;
   customerPhone: string;
@@ -263,10 +279,12 @@ export async function createOrder(input: {
   return orderFromDb(data);
 }
 
-export async function updateOrderStatus(id: string, status: string): Promise<Order | null> {
+export async function updateOrderStatus(id: string, status: string, handledByName?: string): Promise<Order | null> {
   const sb = getSupabaseAdmin();
+  const update: Record<string, any> = { status, updated_at: new Date().toISOString() };
+  if (handledByName) update.handled_by_name = handledByName;
   const { data, error } = await sb.from('orders')
-    .update({ status, updated_at: new Date().toISOString() })
+    .update(update)
     .eq('id', id)
     .select()
     .single();
@@ -406,4 +424,88 @@ export async function listCustomers(): Promise<Customer[]> {
   }
 
   return Array.from(map.values());
+}
+
+// --- ÉQUIPE ---
+function generateTeamCode(): string {
+  // Code numérique simple à 6 chiffres, facile à communiquer par téléphone.
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+export async function listTeamMembers(): Promise<TeamMember[]> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb.from('team_members').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(teamMemberFromDb);
+}
+
+export async function createTeamMember(name: string): Promise<TeamMember> {
+  const sb = getSupabaseAdmin();
+  let code = generateTeamCode();
+  // Évite (rarement) une collision de code.
+  for (let i = 0; i < 5; i++) {
+    const { data: existing } = await sb.from('team_members').select('id').eq('code', code).maybeSingle();
+    if (!existing) break;
+    code = generateTeamCode();
+  }
+  const { data, error } = await sb.from('team_members').insert({ name, code, active: true }).select().single();
+  if (error) throw error;
+  return teamMemberFromDb(data);
+}
+
+export async function regenerateTeamMemberCode(id: string): Promise<TeamMember | null> {
+  const sb = getSupabaseAdmin();
+  const code = generateTeamCode();
+  const { data, error } = await sb.from('team_members').update({ code }).eq('id', id).select().single();
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw error;
+  }
+  return teamMemberFromDb(data);
+}
+
+export async function setTeamMemberActive(id: string, active: boolean): Promise<TeamMember | null> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb.from('team_members').update({ active }).eq('id', id).select().single();
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw error;
+  }
+  return teamMemberFromDb(data);
+}
+
+export async function deleteTeamMember(id: string): Promise<void> {
+  const sb = getSupabaseAdmin();
+  const { error } = await sb.from('team_members').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// Vérifie un code d'accès équipe et renvoie le membre s'il est actif.
+export async function verifyTeamCode(code: string): Promise<TeamMember | null> {
+  const sb = getSupabaseAdmin();
+  const cleanCode = code.trim();
+  const { data, error } = await sb.from('team_members').select('*').eq('code', cleanCode).eq('active', true).maybeSingle();
+  if (error) throw error;
+  return data ? teamMemberFromDb(data) : null;
+}
+
+// --- DÉPENSES / FACTURES D'ACHAT ---
+export async function listExpenses(): Promise<Expense[]> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb.from('expenses').select('*').order('expense_date', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(expenseFromDb);
+}
+
+export async function createExpense(input: Partial<Expense>): Promise<Expense> {
+  const sb = getSupabaseAdmin();
+  const { data, error } = await sb.from('expenses').insert(expenseToDb(input)).select().single();
+  if (error) throw error;
+  return expenseFromDb(data);
+}
+
+export async function deleteExpense(id: string): Promise<void> {
+  const sb = getSupabaseAdmin();
+  const { error } = await sb.from('expenses').delete().eq('id', id);
+  if (error) throw error;
 }

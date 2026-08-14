@@ -1,4 +1,4 @@
-import { Product, Category, Order, OrderItem, Wilaya, Review, StockMovement, ShopSettings } from '../../src/types';
+import { Product, Category, Order, OrderItem, Wilaya, Review, StockMovement, ShopSettings, TeamMember, Expense } from '../../src/types';
 
 // --- CATEGORIES ---
 export function categoryFromDb(row: any): Category {
@@ -118,6 +118,7 @@ export function orderFromDb(row: any): Order {
     status: row.status,
     notes: row.notes || undefined,
     items: (row.items || []) as OrderItem[],
+    handledByName: row.handled_by_name || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -191,5 +192,42 @@ export function settingsToDb(s: Partial<ShopSettings>): Record<string, any> {
   if (s.freeShippingMinAmount !== undefined) row.free_shipping_min_amount = s.freeShippingMinAmount;
   if (s.termsAndConditions !== undefined) row.terms_and_conditions = s.termsAndConditions;
   if (s.privacyPolicy !== undefined) row.privacy_policy = s.privacyPolicy;
+  return row;
+}
+
+// --- ÉQUIPE ---
+export function teamMemberFromDb(row: any): TeamMember {
+  return {
+    id: row.id,
+    name: row.name,
+    code: row.code,
+    active: !!row.active,
+    createdAt: row.created_at
+  };
+}
+
+// --- DÉPENSES ---
+export function expenseFromDb(row: any): Expense {
+  return {
+    id: row.id,
+    title: row.title,
+    supplier: row.supplier || undefined,
+    amount: Number(row.amount),
+    category: row.category || 'Autre',
+    invoiceUrl: row.invoice_url || undefined,
+    notes: row.notes || undefined,
+    expenseDate: row.expense_date,
+    createdAt: row.created_at
+  };
+}
+export function expenseToDb(e: Partial<Expense>): Record<string, any> {
+  const row: Record<string, any> = {};
+  if (e.title !== undefined) row.title = e.title;
+  if (e.supplier !== undefined) row.supplier = e.supplier;
+  if (e.amount !== undefined) row.amount = e.amount;
+  if (e.category !== undefined) row.category = e.category;
+  if (e.invoiceUrl !== undefined) row.invoice_url = e.invoiceUrl;
+  if (e.notes !== undefined) row.notes = e.notes;
+  if (e.expenseDate !== undefined) row.expense_date = e.expenseDate;
   return row;
 }
