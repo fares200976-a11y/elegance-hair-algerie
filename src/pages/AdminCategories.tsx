@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, Plus, Trash2, Pencil, Save, X, Upload, ImageOff } from 'lucide-react';
+import { Tag, Plus, Trash2, Pencil, Save, X, Upload, ImageOff, AlertCircle } from 'lucide-react';
 import { fetchCategories, createCategory, updateCategory, deleteCategory, uploadProductImage } from '../lib/api';
 import { Category } from '../types';
 
@@ -16,6 +16,7 @@ export const AdminCategories: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Formulaire d'ajout
   const [name, setName] = useState('');
@@ -88,6 +89,7 @@ export const AdminCategories: React.FC = () => {
     e.preventDefault();
     if (!name.trim()) return;
     setIsSubmitting(true);
+    setErrorMsg(null);
     try {
       const created = await createCategory({
         name: name.trim(),
@@ -99,8 +101,8 @@ export const AdminCategories: React.FC = () => {
       setName('');
       setDescription('');
       setImage(undefined);
-    } catch (err) {
-      console.error('Erreur création catégorie:', err);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Erreur création catégorie');
     } finally {
       setIsSubmitting(false);
     }
@@ -191,6 +193,13 @@ export const AdminCategories: React.FC = () => {
             </label>
           </div>
         </div>
+
+        {errorMsg && (
+          <div className="p-3 bg-rose-100 text-rose-900 font-bold text-xs rounded-xl border border-rose-200 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
         <button
           type="submit"

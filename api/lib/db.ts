@@ -30,7 +30,12 @@ export async function listCategories(): Promise<Category[]> {
 export async function createCategory(input: Partial<Category>): Promise<Category> {
   const sb = getSupabaseAdmin();
   const { data, error } = await sb.from('categories').insert(categoryToDb(input)).select().single();
-  if (error) throw error;
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error(`Une catégorie nommée "${input.name}" existe déjà.`);
+    }
+    throw error;
+  }
   return categoryFromDb(data);
 }
 

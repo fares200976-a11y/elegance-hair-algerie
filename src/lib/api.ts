@@ -53,7 +53,10 @@ export async function createCategory(category: Partial<Category>): Promise<Categ
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(category)
   });
-  if (!res.ok) throw new Error('Erreur création catégorie');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Erreur création catégorie');
+  }
   return await res.json();
 }
 

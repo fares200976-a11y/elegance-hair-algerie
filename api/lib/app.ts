@@ -149,8 +149,12 @@ export function createApp() {
   }));
 
   app.post('/api/categories', requireAdmin, h(async (req, res) => {
-    const newCat = await db.createCategory(req.body);
-    res.status(201).json(newCat);
+    try {
+      const newCat = await db.createCategory(req.body);
+      res.status(201).json(newCat);
+    } catch (err: any) {
+      res.status(409).json({ message: err.message || 'Erreur création catégorie' });
+    }
   }));
 
   app.put('/api/categories/:id', requireAdmin, h(async (req, res) => {
