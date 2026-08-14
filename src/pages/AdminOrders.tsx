@@ -18,6 +18,7 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({ onPrintInvoice }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   const statuses: OrderStatus[] = [
     'Nouvelle',
@@ -179,6 +180,7 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({ onPrintInvoice }) => {
                 <th className="p-4">N° Commande</th>
                 <th className="p-4">Date</th>
                 <th className="p-4">Client / Destinataire</th>
+                <th className="p-4">Produits commandés</th>
                 <th className="p-4">Wilaya & Commune</th>
                 <th className="p-4 text-right">Montant Total</th>
                 <th className="p-4 text-center">Statut Commande</th>
@@ -188,7 +190,8 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({ onPrintInvoice }) => {
             </thead>
             <tbody className="divide-y divide-neutral-200">
               {filteredOrders.map(order => (
-                <tr key={order.id} className="hover:bg-neutral-50">
+                <React.Fragment key={order.id}>
+                <tr className="hover:bg-neutral-50">
                   <td className="p-4 font-mono font-bold text-amber-900 text-sm">
                     {order.orderNumber}
                   </td>
@@ -204,6 +207,25 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({ onPrintInvoice }) => {
                       <Phone className="w-3 h-3" />
                       <span>{order.customerPhone}</span>
                     </a>
+                  </td>
+                  <td className="p-4 max-w-[220px]">
+                    <div className="space-y-1">
+                      {order.items.slice(0, 2).map((it, idx) => (
+                        <div key={idx} className="text-neutral-700">
+                          <span className="font-bold">{it.quantity}×</span> {it.productName}
+                        </div>
+                      ))}
+                      {order.items.length > 2 && (
+                        <span className="text-neutral-400">+{order.items.length - 2} autre(s)</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
+                      className="mt-1.5 text-amber-700 font-bold flex items-center gap-1 hover:underline"
+                    >
+                      <Eye className="w-3 h-3" />
+                      {expandedOrderId === order.id ? 'Masquer le détail' : 'Voir le détail'}
+                    </button>
                   </td>
                   <td className="p-4">
                     <strong className="text-neutral-900 block">{order.wilayaName}</strong>
@@ -276,6 +298,43 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({ onPrintInvoice }) => {
                     </button>
                   </td>
                 </tr>
+
+                {expandedOrderId === order.id && (
+                  <tr className="bg-amber-50/60">
+                    <td colSpan={8} className="p-4">
+                      <div className="bg-white rounded-2xl border border-amber-200 p-4 space-y-2">
+                        <span className="text-xs font-extrabold text-amber-900 uppercase block mb-2">
+                          Détail des produits — {order.orderNumber} ({order.items.length} article{order.items.length > 1 ? 's' : ''})
+                        </span>
+                        <div className="divide-y divide-neutral-100">
+                          {order.items.map((it, idx) => (
+                            <div key={idx} className="flex items-center gap-3 py-2">
+                              {it.productImage ? (
+                                <img src={it.productImage} alt={it.productName} className="w-12 h-12 object-cover rounded-lg border border-neutral-200 shrink-0" />
+                              ) : (
+                                <div className="w-12 h-12 rounded-lg bg-neutral-100 shrink-0" />
+                              )}
+                              <div className="flex-1">
+                                <span className="font-bold text-neutral-900 block">{it.productName}</span>
+                                <span className="text-neutral-500">{it.brand}</span>
+                              </div>
+                              <div className="text-right whitespace-nowrap">
+                                <span className="font-bold text-neutral-900 block">{it.quantity} × {it.unitPrice.toLocaleString('fr-FR')} DA</span>
+                                <span className="text-amber-800 font-extrabold">= {it.totalPrice.toLocaleString('fr-FR')} DA</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {order.notes && (
+                          <div className="pt-2 border-t border-neutral-100 text-neutral-600">
+                            <span className="font-bold text-neutral-800">Note client : </span>{order.notes}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
