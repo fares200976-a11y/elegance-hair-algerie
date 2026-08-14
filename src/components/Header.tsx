@@ -37,6 +37,9 @@ export const Header: React.FC<HeaderProps> = ({
     { label: t('curlers'), categorySlug: 'boucleurs' },
     { label: t('multiStylers'), categorySlug: 'multistylers' },
     { label: t('professional'), categorySlug: 'appareils-professionnels' },
+    { label: t('suitcases'), categorySlug: 'valises' },
+    { label: t('handbags'), categorySlug: 'sacs-a-main' },
+    { label: t('backpacks'), categorySlug: 'sacs-a-dos' },
     { label: t('promotions'), categorySlug: 'promotions' },
     { label: t('tracking'), tab: 'tracking' },
     { label: t('contact'), tab: 'contact' }

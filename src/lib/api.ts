@@ -47,6 +47,31 @@ export async function fetchCategories(): Promise<Category[]> {
   }
 }
 
+export async function createCategory(category: Partial<Category>): Promise<Category> {
+  const res = await fetch(`${API_BASE}/categories`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(category)
+  });
+  if (!res.ok) throw new Error('Erreur création catégorie');
+  return await res.json();
+}
+
+export async function updateCategory(id: string, category: Partial<Category>): Promise<Category> {
+  const res = await fetch(`${API_BASE}/categories/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(category)
+  });
+  if (!res.ok) throw new Error('Erreur modification catégorie');
+  return await res.json();
+}
+
+export async function deleteCategory(id: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/categories/${id}`, { method: 'DELETE', headers: authHeaders() });
+  return res.ok;
+}
+
 export async function fetchWilayas(): Promise<Wilaya[]> {
   try {
     const res = await fetch(`${API_BASE}/wilayas`);
