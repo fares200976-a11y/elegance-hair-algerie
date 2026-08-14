@@ -13,6 +13,7 @@ export const UI_TRANSLATIONS: Record<string, { fr: string; ar: string }> = {
   suitcases: { fr: 'Valises', ar: 'حقائب السفر' },
   handbags: { fr: 'Sacs à Main', ar: 'حقائب يد' },
   backpacks: { fr: 'Sacs à Dos', ar: 'حقائب ظهر' },
+  luggage: { fr: 'Bagagerie', ar: 'حقائب السفر والظهر' },
   promotions: { fr: 'Promotions', ar: 'التخفيضات' },
   tracking: { fr: 'Suivi Commande', ar: 'تتبع الطلب' },
   contact: { fr: 'Contact', ar: 'اتصل بنا' },

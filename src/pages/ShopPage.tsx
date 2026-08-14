@@ -45,6 +45,11 @@ export const ShopPage: React.FC<ShopPageProps> = ({
       // Category filter
       if (selectedCategorySlug === 'promotions') {
         if (!p.isPromo) return false;
+      } else if (selectedCategorySlug === 'bagagerie') {
+        // Vue combinée : Valises + Sacs à main + Sacs à dos, en un seul clic.
+        const luggageSlugs = ['valises', 'sacs-a-main', 'sacs-a-dos'];
+        const catObj = categories.find(c => c.id === p.categoryId);
+        if (!catObj || !luggageSlugs.includes(catObj.slug)) return false;
       } else if (selectedCategorySlug && selectedCategorySlug !== 'all') {
         const catObj = categories.find(c => c.slug === selectedCategorySlug);
         if (catObj && p.categoryId !== catObj.id && p.slug !== selectedCategorySlug) {
@@ -89,6 +94,8 @@ export const ShopPage: React.FC<ShopPageProps> = ({
             <h1 className="text-3xl sm:text-4xl font-serif font-extrabold text-neutral-900">
               {selectedCategorySlug === 'promotions'
                 ? (isAr ? 'التخفيضات والعروض الخاصة' : 'Promotions & Offres Spéciales')
+                : selectedCategorySlug === 'bagagerie'
+                ? (isAr ? 'حقائب السفر والظهر واليد' : 'Bagagerie : Valises, Sacs à Main & Sacs à Dos')
                 : activeCategoryObj
                 ? activeCategoryObj.name
                 : t('shopCatalogTitle')}
@@ -265,7 +272,13 @@ export const ShopPage: React.FC<ShopPageProps> = ({
               <span className="text-neutral-500 font-semibold">{isAr ? 'التصفية النشطة:' : 'Filtres actifs:'}</span>
               {selectedCategorySlug && (
                 <span className="bg-amber-100 text-amber-900 px-3 py-1 rounded-full font-bold flex items-center gap-1">
-                  {isAr ? 'الفئة' : 'Catégorie'}: {selectedCategorySlug}
+                  {isAr ? 'الفئة' : 'Catégorie'}: {
+                    selectedCategorySlug === 'bagagerie'
+                      ? (isAr ? 'حقائب السفر والظهر واليد' : 'Bagagerie')
+                      : selectedCategorySlug === 'promotions'
+                      ? (isAr ? 'التخفيضات' : 'Promotions')
+                      : selectedCategorySlug
+                  }
                   <button onClick={() => setSelectedCategorySlug(undefined)}>
                     <X className="w-3 h-3" />
                   </button>
