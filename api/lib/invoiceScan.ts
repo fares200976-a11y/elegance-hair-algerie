@@ -32,7 +32,7 @@ export async function scanInvoiceImage(imageBase64: string, mediaType: string): 
 Extrait TOUS les articles listés sur la facture. Si un prix ou une quantité n'est pas clairement lisible, fais une estimation raisonnable (quantité par défaut : 1).`;
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
