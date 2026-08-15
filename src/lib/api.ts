@@ -8,6 +8,24 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Réessaie un fetch plusieurs fois avant d'abandonner : évite qu'un simple démarrage à froid
+// du serveur (Vercel) fasse basculer le site sur son catalogue de secours figé (sans les
+// nouvelles catégories/produits). Utilisé pour les appels critiques du catalogue public.
+async function fetchWithRetry(url: string, retries = 2, delayMs = 900): Promise<Response> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok && retries > 0) {
+      await new Promise(r => setTimeout(r, delayMs));
+      return fetchWithRetry(url, retries - 1, delayMs);
+    }
+    return res;
+  } catch (err) {
+    if (retries <= 0) throw err;
+    await new Promise(r => setTimeout(r, delayMs));
+    return fetchWithRetry(url, retries - 1, delayMs);
+  }
+}
+
 export async function fetchProducts(params?: { category?: string; search?: string; promo?: boolean; featured?: boolean }): Promise<Product[]> {
   try {
     const query = new URLSearchParams();
@@ -16,7 +34,7 @@ export async function fetchProducts(params?: { category?: string; search?: strin
     if (params?.promo) query.append('promo', 'true');
     if (params?.featured) query.append('featured', 'true');
 
-    const res = await fetch(`${API_BASE}/products?${query.toString()}`);
+    const res = await fetchWithRetry(`${API_BASE}/products?${query.toString()}`);
     if (!res.ok) throw new Error('Échec récupération produits');
     return await res.json();
   } catch (err) {
@@ -38,7 +56,7 @@ export async function fetchProductBySlug(slug: string): Promise<Product | null> 
 
 export async function fetchCategories(): Promise<Category[]> {
   try {
-    const res = await fetch(`${API_BASE}/categories`);
+    const res = await fetchWithRetry(`${API_BASE}/categories`);
     if (!res.ok) throw new Error('Échec récupération catégories');
     return await res.json();
   } catch (err) {
