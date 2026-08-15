@@ -11,33 +11,17 @@ export interface InvoiceScanResult {
 }
 
 // Analyse une photo de facture fournisseur et en extrait les articles.
-// Nécessite la variable d'environnement ANTHROPIC_API_KEY sur Vercel.
+// Utilise l'API Google Gemini (gratuite) — nécessite la variable d'environnement
+// GEMINI_API_KEY sur Vercel (clé créée sur aistudio.google.com/apikey).
 export async function scanInvoiceImage(imageBase64: string, mediaType: string): Promise<InvoiceScanResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error("Le scan de facture n'est pas configuré (ANTHROPIC_API_KEY manquant).");
+    throw new Error("Le scan de facture n'est pas configuré (GEMINI_API_KEY manquant).");
   }
 
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-5',
-      max_tokens: 2000,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Data } },
-            {
-              type: 'text',
-              text: `Analyse cette photo de facture fournisseur (produits achetés en gros pour une boutique). Réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte autour, sans balises markdown, au format EXACT suivant :
+  const prompt = `Analyse cette photo de facture fournisseur (produits achetés en gros pour une boutique). Réponds UNIQUEMENT avec un objet JSON valide, au format EXACT suivant :
 {
   "invoiceNumber": "numéro de facture visible sur le document, ou null si absent",
   "totalAmount": montant total en nombre (sans devise ni espace), ou null si absent,
@@ -45,13 +29,28 @@ export async function scanInvoiceImage(imageBase64: string, mediaType: string): 
     { "name": "nom du produit/article tel qu'écrit sur la facture", "price": prix unitaire en nombre, "quantity": quantité en nombre entier }
   ]
 }
-Extrait TOUS les articles listés sur la facture. Si un prix ou une quantité n'est pas clairement lisible, fais une estimation raisonnable (quantité par défaut : 1).`
-            }
-          ]
+Extrait TOUS les articles listés sur la facture. Si un prix ou une quantité n'est pas clairement lisible, fais une estimation raisonnable (quantité par défaut : 1).`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { inline_data: { mime_type: mediaType || 'image/jpeg', data: base64Data } },
+              { text: prompt }
+            ]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json'
         }
-      ]
-    })
-  });
+      })
+    }
+  );
 
   if (!res.ok) {
     const errText = await res.text();
@@ -59,13 +58,12 @@ Extrait TOUS les articles listés sur la facture. Si un prix ou une quantité n'
   }
 
   const data = await res.json();
-  const textBlock = (data.content || []).find((b: any) => b.type === 'text');
-  if (!textBlock) throw new Error("Réponse de l'IA invalide (aucun texte reçu).");
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("Réponse de l'IA invalide (aucun texte reçu).");
 
-  const cleaned = textBlock.text.replace(/```json|```/g, '').trim();
   let parsed: InvoiceScanResult;
   try {
-    parsed = JSON.parse(cleaned);
+    parsed = JSON.parse(text);
   } catch {
     throw new Error("Impossible de lire la facture. Réessayez avec une photo plus nette et bien cadrée.");
   }

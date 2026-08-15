@@ -138,7 +138,13 @@ export function createApp() {
     const { imageBase64, mediaType } = req.body;
     if (!imageBase64) return void res.status(400).json({ message: 'Photo de facture requise' });
 
-    const result = await scanInvoiceImage(imageBase64, mediaType || 'image/jpeg');
+    let result;
+    try {
+      result = await scanInvoiceImage(imageBase64, mediaType || 'image/jpeg');
+    } catch (err: any) {
+      console.error('Erreur scanInvoiceImage:', err);
+      return void res.status(502).json({ message: err.message || "Erreur lors de l'analyse de la facture" });
+    }
 
     if (!result.items.length) {
       return void res.status(422).json({ message: "Aucun article détecté sur cette facture. Réessayez avec une photo plus nette." });
