@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ShoppingBag, Zap, ShieldCheck, Check, Star, Truck, ArrowLeft, MessageSquare, Box } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShoppingBag, Zap, ShieldCheck, Check, Star, Truck, ArrowLeft, MessageSquare, Box, ZoomIn, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Product } from '../types';
 import { useCart } from '../context/CartContext';
 import { useShop } from '../context/ShopContext';
@@ -24,6 +24,13 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const product = translateProduct(rawProduct);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [isZoomedIn, setIsZoomedIn] = useState(false);
+
+  useEffect(() => {
+    document.body.style.overflow = isLightboxOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isLightboxOpen]);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<'desc' | 'specs' | 'box' | 'reviews'>('desc');
 
@@ -91,13 +98,19 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 bg-white p-6 sm:p-10 rounded-3xl border border-neutral-200 shadow-sm">
         {/* Left: Gallery Column */}
         <div className="lg:col-span-6 space-y-4">
-          <div className="aspect-4/3 rounded-2xl overflow-hidden bg-neutral-100 border border-neutral-200 relative group">
+          <div
+            className="aspect-4/3 rounded-2xl overflow-hidden bg-neutral-100 border border-neutral-200 relative group cursor-zoom-in"
+            onClick={() => setIsLightboxOpen(true)}
+          >
             <img
               src={images[activeImageIndex]}
               alt={product.name}
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
+            <div className="absolute bottom-3 right-3 ltr:right-3 ltr:left-auto rtl:left-3 rtl:right-auto w-9 h-9 rounded-full bg-white/90 flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity">
+              <ZoomIn className="w-4 h-4 text-neutral-800" />
+            </div>
             {product.isNew && (
               <span className="absolute top-4 left-4 ltr:left-4 ltr:right-auto rtl:right-4 rtl:left-auto px-3 py-1 bg-neutral-900 text-amber-300 font-extrabold text-xs rounded-lg uppercase tracking-wider">
                 {t('newBadge')}
@@ -449,7 +462,75 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           </div>
         )}
       </div>
+
+      {/* Visionneuse plein écran avec zoom tactile (pincer sur mobile, double-clic sur ordinateur) */}
+      {isLightboxOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col">
+          {/* Barre du haut */}
+          <div className="flex items-center justify-between p-4 shrink-0">
+            <span className="text-white/70 text-xs font-semibold">
+              {activeImageIndex + 1} / {images.length}
+            </span>
+            <button
+              onClick={() => { setIsLightboxOpen(false); setIsZoomedIn(false); }}
+              className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"
+              aria-label="Fermer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Zone image : pincer pour zoomer nativement (mobile), double-clic pour zoomer (ordinateur) */}
+          <div
+            className="flex-1 overflow-auto flex items-center justify-center"
+            style={{ touchAction: 'pinch-zoom' }}
+            onDoubleClick={() => setIsZoomedIn(z => !z)}
+          >
+            <img
+              src={images[activeImageIndex]}
+              alt={product.name}
+              referrerPolicy="no-referrer"
+              className={`transition-transform duration-300 ${isZoomedIn ? 'scale-[2] cursor-zoom-out' : 'max-w-full max-h-full cursor-zoom-in'} object-contain`}
+              onClick={() => setIsZoomedIn(z => !z)}
+            />
+          </div>
+
+          {/* Navigation précédent/suivant */}
+          {images.length > 1 && (
+            <>
+              <button
+                onClick={() => { setActiveImageIndex(i => (i - 1 + images.length) % images.length); setIsZoomedIn(false); }}
+                className="absolute left-3 rtl:right-3 rtl:left-auto top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"
+                aria-label="Image précédente"
+              >
+                <ChevronLeft className="w-6 h-6 rtl:rotate-180" />
+              </button>
+              <button
+                onClick={() => { setActiveImageIndex(i => (i + 1) % images.length); setIsZoomedIn(false); }}
+                className="absolute right-3 rtl:left-3 rtl:right-auto top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"
+                aria-label="Image suivante"
+              >
+                <ChevronRight className="w-6 h-6 rtl:rotate-180" />
+              </button>
+
+              {/* Vignettes du bas */}
+              <div className="flex items-center justify-center gap-2 p-4 shrink-0 overflow-x-auto">
+                {images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => { setActiveImageIndex(idx); setIsZoomedIn(false); }}
+                    className={`w-12 h-12 rounded-lg overflow-hidden border-2 shrink-0 ${
+                      activeImageIndex === idx ? 'border-amber-500' : 'border-white/20 opacity-60'
+                    }`}
+                  >
+                    <img src={img} alt={`Thumb ${idx}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };
-
