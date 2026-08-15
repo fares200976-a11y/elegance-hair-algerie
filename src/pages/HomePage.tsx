@@ -22,8 +22,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   const { products, categories, reviews } = useShop();
   const { t, translateCategory, isAr } = useLanguage();
 
-  const featuredProducts = products.filter(p => p.isFeatured).slice(0, 4);
-  const newProducts = products.filter(p => p.isNew).slice(0, 4);
+  const featuredProducts = products.filter(p => p.isFeatured && p.status !== 'draft').slice(0, 4);
+  const newProducts = products.filter(p => p.isNew && p.status !== 'draft').slice(0, 4);
 
   const handleCategorySelect = (slug: string) => {
     setSelectedCategorySlug(slug);

@@ -561,3 +561,63 @@ export async function deleteExpense(id: string): Promise<void> {
   const { error } = await sb.from('expenses').delete().eq('id', id);
   if (error) throw error;
 }
+
+// --- SCAN DE FACTURE (IA) ---
+function slugifyBackend(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+export async function isInvoiceAlreadyImported(invoiceNumber: string, totalAmount: number | null): Promise<boolean> {
+  const sb = getSupabaseAdmin();
+  let query = sb.from('invoice_imports').select('id').eq('invoice_number', invoiceNumber);
+  query = totalAmount !== null ? query.eq('total_amount', totalAmount) : query.is('total_amount', null);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
+export async function recordInvoiceImport(invoiceNumber: string, totalAmount: number | null, itemsCount: number): Promise<void> {
+  const sb = getSupabaseAdmin();
+  const { error } = await sb.from('invoice_imports').insert({
+    invoice_number: invoiceNumber,
+    total_amount: totalAmount,
+    items_count: itemsCount
+  });
+  if (error) throw error;
+}
+
+// Crée des produits en BROUILLON (status: 'draft') à partir des articles détectés sur une facture.
+// L'admin doit ensuite les compléter (catégorie, image, description) et les publier.
+export async function createDraftProductsFromInvoice(
+  items: { name: string; price: number; quantity: number }[]
+): Promise<Product[]> {
+  const sb = getSupabaseAdmin();
+  const created: Product[] = [];
+
+  for (const item of items) {
+    const baseSlug = slugifyBackend(item.name) || 'produit';
+    const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const row = productToDb({
+      status: 'draft',
+      isNew: true,
+      minStock: 5,
+      techSpecs: [],
+      boxContent: [],
+      images: [],
+      name: item.name,
+      slug: uniqueSlug,
+      price: item.price,
+      stock: item.quantity,
+      shortDesc: 'Produit importé automatiquement depuis une facture — à compléter avant publication.'
+    } as Partial<Product>);
+    const { data, error } = await sb.from('products').insert(row).select().single();
+    if (error) throw error;
+    created.push(productFromDb(data));
+  }
+
+  return created;
+}

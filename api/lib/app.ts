@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAdmin, verifyAdminLogin, requireStaffOrAdmin, issueStaffToken } from './auth.js';
 import { notifyNewOrder } from './notify.js';
+import { scanInvoiceImage } from './invoiceScan.js';
 import { getSupabaseAdmin } from './supabaseAdmin.js';
 import * as db from './db.js';
 
@@ -130,6 +131,39 @@ export function createApp() {
   app.post('/api/products', requireAdmin, h(async (req, res) => {
     const newProduct = await db.createProduct(req.body);
     res.status(201).json(newProduct);
+  }));
+
+  // Scan de facture par IA : détecte les articles, crée des brouillons, évite les doublons (n° facture + prix).
+  app.post('/api/products/scan-invoice', requireAdmin, h(async (req, res) => {
+    const { imageBase64, mediaType } = req.body;
+    if (!imageBase64) return void res.status(400).json({ message: 'Photo de facture requise' });
+
+    const result = await scanInvoiceImage(imageBase64, mediaType || 'image/jpeg');
+
+    if (!result.items.length) {
+      return void res.status(422).json({ message: "Aucun article détecté sur cette facture. Réessayez avec une photo plus nette." });
+    }
+
+    if (result.invoiceNumber) {
+      const alreadyDone = await db.isInvoiceAlreadyImported(result.invoiceNumber, result.totalAmount);
+      if (alreadyDone) {
+        return void res.status(409).json({
+          message: `Cette facture (n° ${result.invoiceNumber}) a déjà été importée précédemment — aucun doublon créé.`
+        });
+      }
+    }
+
+    const created = await db.createDraftProductsFromInvoice(result.items);
+
+    if (result.invoiceNumber) {
+      await db.recordInvoiceImport(result.invoiceNumber, result.totalAmount, created.length);
+    }
+
+    res.status(201).json({
+      invoiceNumber: result.invoiceNumber,
+      totalAmount: result.totalAmount,
+      products: created
+    });
   }));
 
   app.put('/api/products/:id', requireAdmin, h(async (req, res) => {

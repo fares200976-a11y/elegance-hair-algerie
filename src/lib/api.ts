@@ -352,3 +352,21 @@ export async function deleteExpense(id: string): Promise<boolean> {
   const res = await fetch(`${API_BASE}/expenses/${id}`, { method: 'DELETE', headers: authHeaders() });
   return res.ok;
 }
+
+// --- SCAN DE FACTURE (IA) ---
+export interface InvoiceScanResponse {
+  invoiceNumber: string | null;
+  totalAmount: number | null;
+  products: Product[];
+}
+
+export async function scanInvoice(imageBase64: string, mediaType: string): Promise<InvoiceScanResponse> {
+  const res = await fetch(`${API_BASE}/products/scan-invoice`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ imageBase64, mediaType })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Erreur analyse facture');
+  return data;
+}

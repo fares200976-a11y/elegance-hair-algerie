@@ -33,10 +33,11 @@ import { AdminOrders } from './pages/AdminOrders';
 import { AdminTeam } from './pages/AdminTeam';
 import { AdminExpenses } from './pages/AdminExpenses';
 import { AdminCategories } from './pages/AdminCategories';
+import { AdminInvoiceScan } from './pages/AdminInvoiceScan';
 import { StaffLoginPage } from './pages/StaffLoginPage';
 
 import { Product, Order } from './types';
-import { LayoutDashboard, Package, ShoppingBag, LogOut, Store, Check, X, Users, Receipt, Tag } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, LogOut, Store, Check, X, Users, Receipt, Tag, ScanLine } from 'lucide-react';
 
 const ToastNotification: React.FC = () => {
   const { toastMessage, clearToast } = useCart();
@@ -225,7 +226,7 @@ const PrintInvoiceRoute: React.FC = () => {
 // Admin Section Component
 const AdminLayout: React.FC = () => {
   const { isAdminAuthenticated, logoutAdmin } = useAuth();
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'orders' | 'team' | 'expenses' | 'categories'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'orders' | 'team' | 'expenses' | 'categories' | 'invoiceScan'>('dashboard');
   const navigate = useNavigate();
 
   if (!isAdminAuthenticated) {
@@ -287,6 +288,18 @@ const AdminLayout: React.FC = () => {
               >
                 <Tag className="w-4 h-4" />
                 <span className="hidden sm:inline">Catégories</span>
+              </button>
+
+              <button
+                onClick={() => setAdminTab('invoiceScan')}
+                className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-colors ${
+                  adminTab === 'invoiceScan'
+                    ? 'bg-amber-500 text-neutral-950 shadow-xs'
+                    : 'text-neutral-300 hover:bg-neutral-800'
+                }`}
+              >
+                <ScanLine className="w-4 h-4" />
+                <span className="hidden sm:inline">Scanner Facture</span>
               </button>
 
               <button
@@ -354,6 +367,7 @@ const AdminLayout: React.FC = () => {
         {adminTab === 'dashboard' && <AdminDashboard />}
         {adminTab === 'products' && <AdminProducts />}
         {adminTab === 'categories' && <AdminCategories />}
+        {adminTab === 'invoiceScan' && <AdminInvoiceScan />}
         {adminTab === 'orders' && (
           <AdminOrders onPrintInvoice={orderId => navigate(`/facture/${orderId}`)} />
         )}

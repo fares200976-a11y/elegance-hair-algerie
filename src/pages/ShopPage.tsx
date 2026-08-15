@@ -42,6 +42,9 @@ export const ShopPage: React.FC<ShopPageProps> = ({
   // Filter products
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
+      // Les produits en brouillon (ex: importés par scan de facture, non finalisés) restent invisibles au public.
+      if (p.status === 'draft') return false;
+
       // Category filter
       if (selectedCategorySlug === 'promotions') {
         if (!p.isPromo) return false;

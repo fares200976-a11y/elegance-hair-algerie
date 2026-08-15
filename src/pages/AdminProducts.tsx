@@ -23,13 +23,14 @@ export const AdminProducts: React.FC = () => {
   const [stock, setStock] = useState(10);
   const [shortDesc, setShortDesc] = useState('');
   const [fullDesc, setFullDesc] = useState('');
-  const [power, setPower] = useState('1600W');
-  const [temperature, setTemperature] = useState('140°C - 210°C');
+  const [power, setPower] = useState('');
+  const [temperature, setTemperature] = useState('');
   const [color, setColor] = useState('Rose Gold');
   const [warranty, setWarranty] = useState('2 Ans Garantie Officielle');
   const [isFeatured, setIsFeatured] = useState(false);
   const [isNew, setIsNew] = useState(false);
   const [isPromo, setIsPromo] = useState(false);
+  const [status, setStatus] = useState<'active' | 'draft'>('active');
   const [techSpecsInput, setTechSpecsInput] = useState('');
   const [boxContentInput, setBoxContentInput] = useState('');
   
@@ -60,23 +61,24 @@ export const AdminProducts: React.FC = () => {
   const handleOpenAddModal = () => {
     setEditingProduct(null);
     setName('');
-    setBrand('Dyson');
+    setBrand('');
     setSkuRef(`REF-${Math.floor(1000 + Math.random() * 9000)}`);
-    setPrice(12000);
-    setOldPrice(15000);
+    setPrice(0);
+    setOldPrice(0);
     setStock(10);
     setShortDesc('');
     setFullDesc('');
-    setPower('1600W');
-    setTemperature('140°C - 210°C');
-    setColor('Rose Gold');
+    setPower('');
+    setTemperature('');
+    setColor('');
     setWarranty('2 Ans Garantie Officielle');
     setIsFeatured(false);
     setIsNew(true);
     setIsPromo(false);
-    setTechSpecsInput('Moteur digital V9 110 000 tr/min\nTechnologie ionique anti-frizz\nCordon rotatif 360° de 2.7m');
-    setBoxContentInput('Appareil principal\nEmbout concentrateur\nEtui de rangement rigide\nCarte de garantie');
-    setImageUrls(['/src/assets/images/dryer_pro_1786185885233.jpg']);
+    setStatus('active');
+    setTechSpecsInput('');
+    setBoxContentInput('');
+    setImageUrls([]);
     setIsModalOpen(true);
   };
 
@@ -98,6 +100,7 @@ export const AdminProducts: React.FC = () => {
     setIsFeatured(p.isFeatured);
     setIsNew(p.isNew);
     setIsPromo(p.isPromo);
+    setStatus(p.status || 'active');
     setTechSpecsInput((p.techSpecs || []).join('\n'));
     setBoxContentInput((p.boxContent || []).join('\n'));
     setImageUrls(p.images || []);
@@ -157,6 +160,7 @@ export const AdminProducts: React.FC = () => {
       isFeatured,
       isNew,
       isPromo,
+      status,
       images: imageUrls.length > 0 ? imageUrls : ['https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&q=80'],
       techSpecs: techSpecsInput.split('\n').filter(s => s.trim() !== ''),
       boxContent: boxContentInput.split('\n').filter(s => s.trim() !== '')
@@ -292,6 +296,7 @@ export const AdminProducts: React.FC = () => {
                       {product.isFeatured && <span className="bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded text-[10px] font-bold">P</span>}
                       {product.isNew && <span className="bg-neutral-900 text-amber-300 px-1.5 py-0.5 rounded text-[10px] font-bold">N</span>}
                       {product.isPromo && <span className="bg-rose-600 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">%</span>}
+                      {product.status === 'draft' && <span className="bg-neutral-300 text-neutral-800 px-1.5 py-0.5 rounded text-[10px] font-bold">BROUILLON</span>}
                     </td>
                     <td className="p-4 text-right space-x-2">
                       <button
@@ -534,6 +539,18 @@ export const AdminProducts: React.FC = () => {
                     className="accent-amber-600 w-4 h-4"
                   />
                   <span>En Promotion</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs font-bold text-neutral-800 col-span-2 sm:col-span-1">
+                  <span>Statut :</span>
+                  <select
+                    value={status}
+                    onChange={e => setStatus(e.target.value as 'active' | 'draft')}
+                    className="p-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs outline-none focus:border-amber-500"
+                  >
+                    <option value="active">Actif (visible sur le site)</option>
+                    <option value="draft">Brouillon (caché, en préparation)</option>
+                  </select>
                 </label>
               </div>
 
